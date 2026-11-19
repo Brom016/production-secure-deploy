@@ -1,33 +1,33 @@
-# Deploy ke cPanel Shared Hosting Tanpa Terminal
+# Deploying to cPanel Shared Hosting Without a Terminal
 
-Asumsi: aplikasi PHP/Laravel, semua pekerjaan berat (composer, build) dilakukan di komputer lokal, server hanya menerima hasil jadi lewat File Manager. Jika stacknya statis (Vite/React/HTML), ikuti langkah 1 sampai 3 dan 7 sampai 10 saja. Jika Node.js, cek apakah cPanel punya menu "Setup Node.js App"; jika tidak ada, Node tidak bisa dijalankan di hosting itu.
+Assumption: a PHP/Laravel application where all heavy work (composer, build) happens on the local machine, and the server only receives the finished result through File Manager. If the stack is static (Vite/React/HTML), follow steps 1 to 3 and 7 to 10 only. If it is Node.js, check whether cPanel has a "Setup Node.js App" menu; if not, Node cannot run on that host.
 
-## 1. Persiapan di lokal
+## 1. Local preparation
 
-1. Samakan versi PHP lokal dengan versi di cPanel (menu MultiPHP Manager). Aktifkan ekstensi yang dibutuhkan di menu Select PHP Version.
-2. Di `composer.json` kunci versi PHP target agar vendor kompatibel:
-   `composer config platform.php 8.3.0` (sesuaikan versi hosting).
-3. Jalankan:
+1. Match the local PHP version to the one in cPanel (MultiPHP Manager). Enable required extensions in Select PHP Version.
+2. Lock the target PHP version in `composer.json` so vendor stays compatible:
+   `composer config platform.php 8.3.0` (adjust to the host version).
+3. Run:
    - `composer install --no-dev --optimize-autoloader`
-   - `npm ci && npm run build` (jika memakai Vite/Mix)
-4. Jangan jalankan `php artisan config:cache` atau `route:cache` di lokal. Cache config menyimpan path dan nilai dari mesin lokal, sehingga aplikasi bisa rusak atau memakai konfigurasi yang salah di server.
-5. Siapkan APP_KEY baru khusus production: `php artisan key:generate --show`, simpan hasilnya untuk langkah 5. Jangan pakai APP_KEY lokal.
-6. Buat zip, dengan pengecualian: `.env`, `.git`, `node_modules`, `tests`, `storage/logs/*`, `storage/framework/cache/*`, `storage/framework/sessions/*`, `storage/framework/views/*`, file `.sql`. Pertahankan struktur folder `storage/` kosong beserta subfoldernya.
-7. Backup dulu: unduh backup lewat menu Backup cPanel (atau export database lewat phpMyAdmin dan zip folder lama) sebelum menimpa apa pun.
+   - `npm ci && npm run build` (if using Vite/Mix)
+4. Do not run `php artisan config:cache` or `route:cache` locally. The config cache stores paths and values from the local machine, which can break the app or load wrong configuration on the server.
+5. Generate a new production APP_KEY: `php artisan key:generate --show`, and keep the result for step 5. Do not reuse the local APP_KEY.
+6. Create the zip with these exclusions: `.env`, `.git`, `node_modules`, `tests`, `storage/logs/*`, `storage/framework/cache/*`, `storage/framework/sessions/*`, `storage/framework/views/*`, and any `.sql` files. Keep the empty `storage/` folder structure and its subfolders.
+7. Back up first: download a backup from the cPanel Backup menu (or export the database in phpMyAdmin and zip the old folder) before overwriting anything.
 
-## 2. Struktur folder yang aman (Laravel)
+## 2. Safe folder structure (Laravel)
 
-Folder publik hanya boleh berisi isi `public/`. Seluruh kode aplikasi harus berada di luar `public_html`.
+The public folder must contain only the contents of `public/`. All application code must live outside `public_html`.
 
 ```
 /home/USER/
-  laravel_app/        <- semua isi proyek KECUALI folder public
-  public_html/        <- isi folder public (index.php, build/, .htaccess)
+  laravel_app/        <- the whole project EXCEPT the public folder
+  public_html/        <- contents of the public folder (index.php, build/, .htaccess)
 ```
 
-Opsi yang lebih baik jika tersedia: ubah document root domain atau subdomain ke `laravel_app/public` lewat menu Domains di cPanel. Dengan itu tidak perlu mengubah `index.php`. Pada banyak shared hosting opsi ini hanya tersedia untuk subdomain atau addon domain, bukan domain utama. Cek dulu sebelum memilih.
+Better option when available: change the document root of the domain or subdomain to `laravel_app/public` in the Domains menu of cPanel. Then `index.php` does not need editing. On many shared hosts this is available only for subdomains or addon domains, not the primary domain. Check before choosing.
 
-Jika memakai struktur dua folder di atas, edit `public_html/index.php` agar menunjuk ke `laravel_app` (contoh Laravel 11/12):
+If you use the two-folder structure above, edit `public_html/index.php` to point to `laravel_app` (Laravel 11/12 example):
 
 ```php
 if (file_exists($maintenance = __DIR__.'/../laravel_app/storage/framework/maintenance.php')) {
@@ -39,63 +39,63 @@ require __DIR__.'/../laravel_app/vendor/autoload.php';
 $app = require_once __DIR__.'/../laravel_app/bootstrap/app.php';
 ```
 
-Jangan menaruh seluruh proyek langsung di `public_html`. Itu membuat `.env`, `vendor`, dan `storage` berpotensi bisa diunduh.
+Never put the whole project directly in `public_html`. That makes `.env`, `vendor`, and `storage` potentially downloadable.
 
-## 3. Upload dan ekstrak
+## 3. Upload and extract
 
-1. File Manager, masuk ke `/home/USER/`, klik Upload, kirim zip. Jika batas ukuran upload terlalu kecil, pecah zip menjadi beberapa bagian (misalnya `vendor` terpisah dari kode).
-2. Klik kanan zip, pilih Extract. Pindahkan isi folder `public` ke `public_html`, sisanya ke `laravel_app`.
-3. Hapus file zip setelah ekstrak selesai. Zip yang tertinggal di `public_html` bisa diunduh publik.
+1. In File Manager, go to `/home/USER/`, click Upload, and send the zip. If the upload size limit is too small, split the zip into parts (for example `vendor` separately from the code).
+2. Right-click the zip and choose Extract. Move the contents of the `public` folder to `public_html`, and the rest to `laravel_app`.
+3. Delete the zip file after extraction. A zip left in `public_html` can be downloaded by anyone.
 
 ## 4. Database
 
-1. cPanel, MySQL Database Wizard: buat database, buat user dengan password kuat acak, beri hak sesuai kebutuhan aplikasi saja.
-2. Tanpa terminal, `php artisan migrate` tidak bisa dijalankan langsung. Cara aman: export struktur tabel dari lokal (`mysqldump --no-data` atau fitur export phpMyAdmin lokal) lalu import lewat phpMyAdmin di cPanel. Jangan ikut mengimpor data dev, user dummy, atau seeder berisi password default.
-3. Jangan membuat route web sementara untuk menjalankan migrasi. Itu pola yang sering lupa dihapus dan menjadi celah.
-4. Alternatif jika benar-benar perlu artisan: gunakan Cron Jobs cPanel (langkah 6).
+1. In cPanel, use MySQL Database Wizard: create the database, create a user with a strong random password, and grant only the privileges the application needs.
+2. Without a terminal, `php artisan migrate` cannot be run directly. Safe approach: export the table structure from local (`mysqldump --no-data` or the local phpMyAdmin export) and import it through phpMyAdmin in cPanel. Do not import development data, dummy users, or seeders containing default passwords.
+3. Do not create a temporary web route to run migrations. That pattern is often forgotten and becomes a vulnerability.
+4. If artisan is truly needed, use cPanel Cron Jobs (step 6).
 
-## 5. File .env
+## 5. The .env file
 
-1. Buat file `.env` baru lewat File Manager di `laravel_app/`, bukan hasil salinan `.env` lokal.
-2. Isi minimum:
+1. Create a new `.env` through File Manager inside `laravel_app/`. Do not copy the local `.env`.
+2. Minimum contents:
    ```
    APP_ENV=production
    APP_DEBUG=false
-   APP_KEY=<hasil key:generate --show>
-   APP_URL=https://domainanda.com
+   APP_KEY=<output of key:generate --show>
+   APP_URL=https://yourdomain.com
    DB_HOST=localhost
-   DB_DATABASE=<nama db dengan prefix cPanel>
-   DB_USERNAME=<user db>
+   DB_DATABASE=<db name with cPanel prefix>
+   DB_USERNAME=<db user>
    DB_PASSWORD=<password>
    SESSION_SECURE_COOKIE=true
    LOG_LEVEL=warning
    ```
-3. Atur permission `.env` menjadi 640 (klik kanan, Change Permissions). Pastikan tidak ada salinan seperti `.env.bak` atau `.env.old`.
+3. Set `.env` permission to 640 (right-click, Change Permissions). Make sure no copies such as `.env.bak` or `.env.old` exist.
 
-## 6. Perintah artisan dan storage link tanpa terminal
+## 6. Artisan commands and storage link without a terminal
 
-Gunakan cron job cPanel sebagai pengganti terminal. Buat cron, set jadwal beberapa menit ke depan, tunggu berjalan, lalu hapus cron-nya.
+Use cPanel cron jobs as a terminal replacement. Create a cron job, set the schedule a few minutes ahead, wait for it to run, then delete it.
 
-- Storage link (satu kali):
+- Storage link (one time):
   `ln -s /home/USER/laravel_app/storage/app/public /home/USER/public_html/storage`
-- Perintah artisan (satu kali), cek path PHP di halaman cron cPanel karena bisa berbeda, misalnya `/usr/local/bin/ea-php83`:
+- Artisan command (one time). Check the PHP path on the cPanel cron page since it may differ, for example `/usr/local/bin/ea-php83`:
   `/usr/local/bin/ea-php83 /home/USER/laravel_app/artisan optimize:clear`
-- Scheduler Laravel (permanen, tiap menit):
+- Laravel scheduler (permanent, every minute):
   `* * * * * /usr/local/bin/ea-php83 /home/USER/laravel_app/artisan schedule:run >/dev/null 2>&1`
-- Queue: shared hosting tidak menjalankan worker permanen. Gunakan `QUEUE_CONNECTION=sync` atau jadwalkan `queue:work --stop-when-empty` lewat scheduler, dan terima keterbatasannya.
+- Queue: shared hosting does not run permanent workers. Use `QUEUE_CONNECTION=sync`, or schedule `queue:work --stop-when-empty` through the scheduler, and accept the limitations.
 
-Jika host memblokir `ln -s`, ubah root disk `public` di `config/filesystems.php` agar menulis langsung ke `public_html/storage`.
+If the host blocks `ln -s`, change the `public` disk root in `config/filesystems.php` so it writes directly to `public_html/storage`.
 
-## 7. Permission
+## 7. Permissions
 
-- Folder 755, file 644. `.env` 640.
-- `storage/` dan `bootstrap/cache/` harus bisa ditulis oleh akun hosting. Pada hosting yang menjalankan PHP sebagai user akun sendiri, 755 sudah cukup.
-- Jangan pernah 777.
+- Folders 755, files 644. `.env` 640.
+- `storage/` and `bootstrap/cache/` must be writable by the hosting account. On hosts that run PHP as your own account user, 755 is enough.
+- Never 777.
 
-## 8. SSL dan HTTPS
+## 8. SSL and HTTPS
 
-1. cPanel, SSL/TLS Status, jalankan AutoSSL untuk domain. Pastikan sertifikat valid.
-2. Setelah sertifikat aktif, paksa HTTPS di `public_html/.htaccess` (bagian paling atas, sebelum aturan Laravel):
+1. In cPanel, open SSL/TLS Status and run AutoSSL for the domain. Make sure the certificate is valid.
+2. Once the certificate is active, force HTTPS in `public_html/.htaccess` (at the very top, before the Laravel rules):
 
 ```apache
 RewriteEngine On
@@ -103,11 +103,11 @@ RewriteCond %{HTTPS} !=on
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 ```
 
-3. Tambahkan HSTS hanya setelah yakin HTTPS stabil di semua subdomain yang terdampak, karena sulit dibatalkan di browser user.
+3. Add HSTS only after you are sure HTTPS is stable on every affected subdomain, because it is hard to undo in browsers.
 
-## 9. Hardening .htaccess
+## 9. .htaccess hardening
 
-Tambahkan ke `public_html/.htaccess`:
+Add to `public_html/.htaccess`:
 
 ```apache
 Options -Indexes
@@ -128,28 +128,28 @@ Options -Indexes
 </IfModule>
 ```
 
-Folder upload publik: tambahkan `.htaccess` berisi `php_flag engine off` atau `RemoveHandler .php .phtml` (sesuaikan dengan handler hosting) agar file yang terupload tidak bisa dieksekusi. CSP tidak disertakan di sini karena harus disusun sesuai aset aplikasi; uji dulu dengan mode report-only.
+Public upload folder: add an `.htaccess` containing `php_flag engine off` or `RemoveHandler .php .phtml` (match your host's handler) so uploaded files cannot be executed. CSP is not included here because it must be built around the application's assets; test it in report-only mode first.
 
-## 10. Verifikasi setelah deploy
+## 10. Post-deploy verification
 
-Buka dari browser (jendela privat):
+Open in a private browser window:
 
-1. `https://domain/.env`, `/composer.json`, `/storage/logs/laravel.log`, `/vendor/autoload.php` harus 403 atau 404.
-2. Memicu error sengaja (URL tidak ada, form invalid) tidak menampilkan stack trace.
-3. Login, upload, dan form utama berfungsi. Cek cookie punya flag Secure dan HttpOnly di DevTools.
-4. Uji header dan TLS di securityheaders.com dan ssllabs.com.
-5. Cek log hosting (Metrics, Errors) untuk error PHP yang tidak terlihat di browser.
+1. `https://domain/.env`, `/composer.json`, `/storage/logs/laravel.log`, `/vendor/autoload.php` must return 403 or 404.
+2. Deliberately triggering errors (missing URL, invalid form) must not show a stack trace.
+3. Login, upload, and the main forms work. Check in DevTools that cookies have the Secure and HttpOnly flags.
+4. Test headers and TLS at securityheaders.com and ssllabs.com.
+5. Check the hosting logs (Metrics, Errors) for PHP errors that do not appear in the browser.
 
-## 11. Update berikutnya dan rollback
+## 11. Next updates and rollback
 
-1. Backup database dan folder aplikasi saat ini.
-2. Upload zip rilis baru ke folder staging (misalnya `laravel_app_new`), ekstrak, salin `.env` dan isi `storage/app` dari versi lama.
-3. Ganti nama folder lewat File Manager: `laravel_app` menjadi `laravel_app_prev`, `laravel_app_new` menjadi `laravel_app`. Jika ada migrasi DB, import SQL perubahan skema lebih dulu dan pastikan kompatibel dengan versi lama agar rollback memungkinkan.
-4. Jika bermasalah, kembalikan nama folder. Hapus `laravel_app_prev` setelah beberapa hari stabil.
+1. Back up the database and the current application folder.
+2. Upload the new release zip to a staging folder (for example `laravel_app_new`), extract it, and copy over `.env` and the contents of `storage/app` from the old version.
+3. Swap by renaming in File Manager: `laravel_app` to `laravel_app_prev`, `laravel_app_new` to `laravel_app`. If there are database migrations, import the schema change SQL first and make sure it is compatible with the old version so rollback stays possible.
+4. If something breaks, swap the folder names back. Delete `laravel_app_prev` after a few stable days.
 
-## Keterbatasan yang perlu dipahami
+## Limitations to understand
 
-- Shared hosting berbagi server dengan akun lain. Kamu tidak mengontrol patch OS, WAF, atau isolasi proses. Ini bukan tempat yang cocok untuk data pembayaran atau data pribadi sensitif dalam jumlah besar.
-- Tanpa terminal, deploy manual rawan salah (file tertinggal, permission salah, `.env` terekspos). Setiap rilis harus melewati langkah verifikasi nomor 10.
-- Tanpa CI, tidak ada pengujian otomatis sebelum rilis. Jalankan tes dan `composer audit` di lokal sebelum membuat zip.
-- Jika hosting mendukung Git Version Control di cPanel atau deploy via FTP/SFTP dari CI, itu lebih baik daripada upload manual, walaupun tetap tanpa terminal.
+- Shared hosting shares the server with other accounts. You do not control OS patching, WAF, or process isolation. It is not a suitable place for payment data or large volumes of sensitive personal data.
+- Without a terminal, manual deployment is error-prone (leftover files, wrong permissions, exposed `.env`). Every release must go through the verification in step 10.
+- Without CI there are no automated tests before release. Run tests and `composer audit` locally before creating the zip.
+- If the host supports Git Version Control in cPanel or deployment via FTP/SFTP from CI, that is better than manual upload, even without a terminal.
