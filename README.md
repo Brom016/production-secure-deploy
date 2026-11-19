@@ -67,6 +67,3 @@ Full details, including update and rollback steps, are in `references/cpanel-no-
 
 Edit `SKILL.md` to add project-specific rules, such as your framework conventions or compliance requirements (for example Indonesian PDP law obligations). Keep the file short. Move long, situational material into `references/` so it is only loaded when needed.
 
-## License
-
-Add your preferred license here.
