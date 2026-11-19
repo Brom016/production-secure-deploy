@@ -1,87 +1,87 @@
 ---
 name: production-secure-deploy
-description: Aturan wajib saat membuat, mereview, atau men-deploy kode untuk production agar aman dan sesuai standar industri (OWASP Top 10, ASVS, 12-factor). Gunakan untuk aplikasi web/API (PHP, Laravel, Node, dll), konfigurasi server, upload file, autentikasi, database, dan deploy ke hosting. Gunakan juga jika user menyebut cPanel, shared hosting, File Manager, atau tidak punya akses terminal.
+description: Mandatory rules when writing, reviewing, or deploying code for production so it is secure and follows industry standards (OWASP Top 10, ASVS, 12-factor). Use for web apps and APIs (PHP, Laravel, Node, etc.), server configuration, file uploads, authentication, databases, and hosting deployment. Also use when the user mentions cPanel, shared hosting, File Manager, or having no terminal access.
 ---
 
 # Production Secure Deploy
 
-Standar acuan: OWASP Top 10, OWASP ASVS level 1 sebagai minimum, 12-factor app untuk konfigurasi. Aturan di bawah bersifat wajib kecuali user menyatakan secara eksplisit bahwa itu hanya prototype lokal.
+Reference standards: OWASP Top 10, OWASP ASVS level 1 as the minimum, 12-factor app for configuration. The rules below are mandatory unless the user explicitly states the project is a local-only prototype.
 
-## Aturan kerja dan efisiensi
+## Working rules and efficiency
 
-1. Baca hanya bagian yang relevan dengan tugas. Muat `references/cpanel-no-terminal.md` hanya jika deploy ke cPanel/shared hosting/tanpa terminal.
-2. Tulis kode final langsung. Jangan menjelaskan konsep dasar kecuali ditanya.
-3. Jika stack, versi PHP/Node, atau jenis data (data pribadi, pembayaran, kesehatan) belum diketahui dan mengubah rekomendasi, tanyakan satu kali di awal. Jika tidak mengubah, tulis asumsi dalam satu baris lalu lanjut.
-4. Saat mengubah kode yang sudah ada, kirim hanya bagian yang berubah, bukan seluruh file.
-5. Akhiri dengan maksimal 5 butir risiko tersisa yang spesifik pada tugas itu. Jangan menulis checklist generik yang tidak relevan.
-6. Jangan menyatakan sesuatu "sudah aman" atau "aman 100%". Katakan apa yang sudah ditutup dan apa yang belum diverifikasi.
-7. Jika permintaan user melanggar aturan di bawah (misalnya `APP_DEBUG=true` di production, chmod 777, hardcode password), tolak bagian itu, jelaskan risikonya dalam satu atau dua kalimat, dan berikan alternatif yang berfungsi.
+1. Read only the parts relevant to the task. Load `references/cpanel-no-terminal.md` only when deploying to cPanel, shared hosting, or without terminal access.
+2. Write the final code directly. Do not explain basic concepts unless asked.
+3. If the stack, PHP/Node version, or data type (personal data, payments, health) is unknown and changes the recommendation, ask once at the start. If it does not change the recommendation, state the assumption in one line and continue.
+4. When modifying existing code, send only the changed parts, not the whole file.
+5. End with at most 5 remaining risks specific to this task. Do not output a generic checklist that does not apply.
+6. Never claim something is "secure" or "100% safe". State what has been addressed and what has not been verified.
+7. If the user's request violates the rules below (for example `APP_DEBUG=true` in production, chmod 777, hardcoded passwords), decline that part, explain the risk in one or two sentences, and provide a working alternative.
 
-## Secrets dan konfigurasi
+## Secrets and configuration
 
-- Jangan pernah hardcode secret (password DB, API key, APP_KEY, token) di kode, HTML, JS frontend, atau repo. Gunakan environment/`.env`.
-- File `.env` dan config sensitif ditaruh di luar web root. Jika terpaksa di dalam web root, blokir akses lewat server config.
-- `.env.example` hanya berisi nama variabel dengan nilai kosong atau palsu.
-- Kredensial berbeda untuk dev, staging, production. Jangan pakai ulang.
-- Jika secret pernah ter-commit atau ter-upload publik, anggap bocor dan rotasi, bukan sekadar hapus.
-- Mode debug dan stack trace harus mati di production. Pesan error ke user bersifat generik, detail masuk log.
+- Never hardcode secrets (DB passwords, API keys, APP_KEY, tokens) in code, HTML, frontend JS, or the repository. Use environment variables or `.env`.
+- Keep `.env` and sensitive config outside the web root. If that is impossible, block access through server configuration.
+- `.env.example` contains variable names only, with empty or fake values.
+- Use different credentials for dev, staging, and production. Never reuse them.
+- If a secret was ever committed or uploaded publicly, treat it as leaked and rotate it. Deleting it is not enough.
+- Debug mode and stack traces must be off in production. Users see generic error messages, details go to logs.
 
-## Input, output, dan database
+## Input, output, and database
 
-- Semua query memakai prepared statement/parameter binding atau ORM. Dilarang string concatenation ke SQL, termasuk untuk `ORDER BY` dan nama kolom (gunakan allowlist).
-- Validasi input di server (tipe, panjang, format, allowlist). Validasi di frontend hanya untuk UX.
-- Escape output sesuai konteks (HTML, atribut, JS, URL). Di Blade gunakan `{{ }}`, bukan `{!! !!}` untuk data user. Di React hindari `dangerouslySetInnerHTML`.
-- Mass assignment: definisikan `$fillable` eksplisit, jangan `$guarded = []`.
-- User database aplikasi hanya punya hak yang dibutuhkan (SELECT/INSERT/UPDATE/DELETE pada database itu saja), bukan root atau ALL PRIVILEGES global.
-- Redirect hanya ke URL internal atau allowlist (hindari open redirect). Request ke URL dari user harus dibatasi (hindari SSRF).
+- All queries use prepared statements, parameter binding, or an ORM. String concatenation into SQL is forbidden, including for `ORDER BY` and column names (use an allowlist).
+- Validate input on the server (type, length, format, allowlist). Frontend validation is for UX only.
+- Escape output for its context (HTML, attribute, JS, URL). In Blade use `{{ }}`, not `{!! !!}`, for user data. In React avoid `dangerouslySetInnerHTML`.
+- Mass assignment: define `$fillable` explicitly, never `$guarded = []`.
+- The application database user has only the privileges it needs (SELECT/INSERT/UPDATE/DELETE on that database only), never root or global ALL PRIVILEGES.
+- Redirect only to internal URLs or an allowlist (prevent open redirect). Restrict server-side requests to user-supplied URLs (prevent SSRF).
 
-## Autentikasi dan otorisasi
+## Authentication and authorization
 
-- Password di-hash dengan Argon2id atau bcrypt. Dilarang MD5, SHA1, SHA256 polos, atau enkripsi reversible.
-- Otorisasi dicek di server pada setiap request ke resource, termasuk kepemilikan data (cegah IDOR). Menyembunyikan tombol di UI bukan otorisasi.
-- Rate limit pada login, reset password, OTP, dan endpoint mahal. Pertimbangkan lockout bertahap.
-- Session: regenerate ID setelah login, cookie dengan `Secure`, `HttpOnly`, `SameSite=Lax` atau `Strict`, ada timeout.
-- Proteksi CSRF aktif untuk semua request yang mengubah state. API token disimpan hash-nya, bisa dicabut, dan punya scope.
-- Pesan login dan reset password tidak membocorkan apakah akun ada.
+- Hash passwords with Argon2id or bcrypt. MD5, SHA1, plain SHA256, or reversible encryption are forbidden.
+- Check authorization on the server for every resource request, including data ownership (prevent IDOR). Hiding a button in the UI is not authorization.
+- Rate limit login, password reset, OTP, and expensive endpoints. Consider progressive lockout.
+- Sessions: regenerate the ID after login, cookies with `Secure`, `HttpOnly`, `SameSite=Lax` or `Strict`, and a timeout.
+- CSRF protection on every state-changing request. API tokens are stored hashed, revocable, and scoped.
+- Login and password reset messages must not reveal whether an account exists.
 
-## Upload file
+## File uploads
 
-- Validasi ekstensi dan MIME dengan allowlist, batasi ukuran, ganti nama file dengan nama acak buatan server.
-- Simpan di luar web root atau pastikan eksekusi script dimatikan di folder upload. Jangan pernah izinkan `.php`, `.phtml`, `.phar`, `.htaccess` terupload.
-- Gambar diproses ulang (re-encode) bila memungkinkan. Download file privat lewat controller yang mengecek otorisasi.
+- Validate extension and MIME type with an allowlist, limit size, and rename files with a random server-generated name.
+- Store outside the web root, or make sure script execution is disabled in the upload folder. Never allow `.php`, `.phtml`, `.phar`, or `.htaccess` to be uploaded.
+- Re-encode images where possible. Serve private downloads through a controller that checks authorization.
 
-## Transport dan header
+## Transport and headers
 
-- HTTPS wajib, redirect HTTP ke HTTPS. Aktifkan HSTS setelah HTTPS terverifikasi stabil.
-- Header minimum: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` (atau CSP `frame-ancestors`), `Referrer-Policy`, `Permissions-Policy`. CSP disusun sesuai aplikasi dan diuji, jangan menyalin CSP generik yang merusak halaman atau terlalu longgar (`unsafe-inline` + `*`).
-- CORS: sebutkan origin eksplisit. Dilarang `*` bersama credentials.
-- Matikan directory listing. Blokir akses ke dotfile (`.env`, `.git`), file backup (`.sql`, `.bak`, `.zip`), dan `composer.json/lock`, `package.json` dari web.
+- HTTPS is mandatory, redirect HTTP to HTTPS. Enable HSTS only after HTTPS is verified stable.
+- Minimum headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` (or CSP `frame-ancestors`), `Referrer-Policy`, `Permissions-Policy`. Build CSP for the specific application and test it. Do not copy a generic CSP that breaks pages or is too permissive (`unsafe-inline` plus `*`).
+- CORS: list explicit origins. `*` together with credentials is forbidden.
+- Disable directory listing. Block web access to dotfiles (`.env`, `.git`), backup files (`.sql`, `.bak`, `.zip`), and `composer.json/lock`, `package.json`.
 
-## Dependensi dan build
+## Dependencies and build
 
-- Production hanya berisi dependensi production (`composer install --no-dev --optimize-autoloader`, `npm ci` lalu build).
-- Kunci versi lewat lockfile. Jalankan `composer audit` / `npm audit` sebelum rilis, dan catat temuan yang diabaikan beserta alasannya.
-- Jangan memuat script dari CDN tanpa kebutuhan jelas. Jika perlu, pin versi dan gunakan SRI.
-- Jangan sertakan `.git`, `tests`, `node_modules`, file dokumentasi internal, atau dump database di paket yang diupload.
+- Production contains production dependencies only (`composer install --no-dev --optimize-autoloader`, `npm ci` then build).
+- Pin versions with lockfiles. Run `composer audit` / `npm audit` before release and record ignored findings with a reason.
+- Do not load scripts from a CDN without a clear need. If required, pin the version and use SRI.
+- Never include `.git`, `tests`, `node_modules`, internal documentation, or database dumps in the uploaded package.
 
-## Logging, backup, dan operasional
+## Logging, backup, and operations
 
-- Log kejadian keamanan (login gagal, perubahan hak akses, error 5xx). Jangan mencatat password, token, nomor kartu, atau data pribadi penuh.
-- Backup database dan file terjadwal, simpan di luar server yang sama, dan uji restore minimal sekali. Backup yang belum pernah diuji dianggap tidak ada.
-- Siapkan rencana rollback sebelum deploy: salinan versi sebelumnya tetap ada.
-- Terapkan prinsip least privilege pada akun hosting, FTP, dan database. Aktifkan 2FA pada akun hosting dan registrar domain.
-- Data pribadi: kumpulkan seminimal mungkin dan sebutkan jika ada implikasi UU PDP (Indonesia) pada data yang diproses.
+- Log security events (failed logins, permission changes, 5xx errors). Never log passwords, tokens, card numbers, or full personal data.
+- Schedule backups of the database and files, store them off the same server, and test a restore at least once. A backup that has never been tested counts as no backup.
+- Prepare a rollback plan before deploying: keep a copy of the previous version.
+- Apply least privilege to hosting, FTP, and database accounts. Enable 2FA on hosting and domain registrar accounts.
+- Personal data: collect the minimum, and mention the Indonesian PDP Law (UU PDP) implications when relevant to the data processed.
 
-## Gerbang sebelum deploy
+## Pre-deploy gate
 
-Jangan menyatakan siap deploy sebelum semua ini terjawab:
+Do not declare the project ready to deploy until all of these are answered:
 
-1. Debug mati, secret tidak ada di kode atau paket upload.
-2. Semua endpoint yang mengubah data punya autentikasi, otorisasi, dan CSRF.
-3. Tidak ada query atau output yang rentan injeksi.
-4. HTTPS aktif dan file sensitif tidak bisa diakses dari URL.
-5. Backup dan rollback tersedia.
+1. Debug is off, and no secrets exist in the code or the uploaded package.
+2. Every endpoint that changes data has authentication, authorization, and CSRF protection.
+3. No query or output is vulnerable to injection.
+4. HTTPS is active and sensitive files cannot be reached by URL.
+5. Backup and rollback are available.
 
-## Batas yang harus diakui
+## Limits to acknowledge
 
-Skill ini mengurangi kesalahan umum, tetapi tidak menggantikan code review manusia, pengujian keamanan, atau audit independen. Untuk aplikasi dengan pembayaran, data kesehatan, atau data pribadi volume besar, sebutkan bahwa shared hosting memiliki keterbatasan isolasi dan kontrol, lalu sarankan VPS atau platform terkelola.
+This skill reduces common mistakes but does not replace human code review, security testing, or an independent audit. For applications handling payments, health data, or large volumes of personal data, state that shared hosting has limited isolation and control, and recommend a VPS or managed platform.
